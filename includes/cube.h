@@ -17,6 +17,8 @@
 # define FOV 60
 # define MOVE_SPEED 0.05
 # define ROT_SPEED 0.03
+/* Player collision radius (in map units) - prevents player from getting too close to walls */
+# define PLAYER_RADIUS 0.2
 
 /* Key codes for Linux */
 # define KEY_ESC 65307
@@ -128,7 +130,7 @@ void	init_player(t_game *game, int y, int x, char direction);
 void	raycasting(t_game *game);
 void	init_ray(t_ray *ray, t_player *player, int x);
 void	perform_dda(t_ray *ray, t_player *player, char **map);
-void	calculate_wall_distance(t_ray *ray);
+void	calculate_wall_distance(t_ray *ray, t_player *player);
 void	calculate_step_and_side_dist(t_ray *ray, t_player *player);
 
 /* Graphics functions */
