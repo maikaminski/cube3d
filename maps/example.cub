@@ -1,10 +1,10 @@
-NO ./textures/north_wall.xpm
-SO ./textures/south_wall.xpm
-WE ./textures/west_wall.xpm
-EA ./textures/east_wall.xpm
+NO ./textures/wall.xpm
+SO ./textures/wood.xpm
+WE ./textures/brick.xpm
+EA ./textures/sand.xpm
 
-F 220,100,0
-C 225,230,220
+F 200,200,200
+C 100,100,255
 
         1111111111111111111111111
         1000000000110000000000001

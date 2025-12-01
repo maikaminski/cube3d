@@ -17,6 +17,9 @@ int	main(int argc, char **argv)
 	init_game(&game);
 	if (!parse_file(argv[1], &game))
 	{
+		/* Provide a clear message when parsing/validation fails so the
+		   user understands why the window closes immediately. */
+		printf(ERR_MAP);
 		cleanup_game(&game);
 		return (1);
 	}

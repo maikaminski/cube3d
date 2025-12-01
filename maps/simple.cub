@@ -1,7 +1,7 @@
-NO ./textures/north_wall.xpm
-SO ./textures/south_wall.xpm
-WE ./textures/west_wall.xpm
-EA ./textures/east_wall.xpm
+NO ./textures/wall.xpm
+SO ./textures/wood.xpm
+WE ./textures/brick.xpm
+EA ./textures/sand.xpm
 
 F 100,100,100
 C 50,50,50
