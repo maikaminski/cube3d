@@ -1,0 +1,35 @@
+# Executável
+cub3D
+
+# Arquivos objeto
+*.o
+*.a
+
+# MiniLibX compilada
+minilibx-linux/libmlx.a
+minilibx-linux/libmlx_Linux.a
+minilibx-linux/obj/
+minilibx-linux/test/mlx-test
+minilibx-linux/Makefile.gen
+minilibx-linux/test/Makefile.gen
+
+# Libft compilada
+libft/*.o
+libft/libft.a
+
+# Arquivos de debug
+*.dSYM/
+vgcore.*
+*.log
+
+# Arquivos do sistema
+.DS_Store
+*~
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Arquivos temporários
+*.tmp
+*.temp

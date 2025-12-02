@@ -29,6 +29,7 @@ OBJS = $(SRCS:.c=.o)
 # Compiler and flags
 CC = cc
 CFLAGS = -Wall -Wextra -Werror -g
+LDFLAGS = -no-pie
 INCLUDES = -I$(INC_DIR) -I$(LFT_DIR) -I$(MLX_DIR)
 LIBS = -L$(LFT_DIR) -lft -L$(MLX_DIR) -lmlx -lXext -lX11 -lm
 
@@ -42,7 +43,7 @@ all: $(NAME)
 $(NAME): $(OBJS)
 	@make -C $(LFT_DIR)
 	@make -C $(MLX_DIR)
-	@$(CC) $(OBJS) $(LIBS) -o $(NAME)
+	@$(CC) $(LDFLAGS) $(OBJS) $(LIBS) -o $(NAME)
 	@echo "$(GREEN)✅ $(NAME) compiled successfully!$(RESET)"
 
 %.o: %.c
