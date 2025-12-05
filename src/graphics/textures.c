@@ -8,8 +8,11 @@ t_img	*load_texture(t_game *game, char *path)
 	if (!texture)
 		return (NULL);
 	texture->img = mlx_xpm_file_to_image(game->mlx, path, &texture->width, &texture->height);
+	printf("Carregando textura: %s\n", path);
+	fflush(stdout);
 	if (!texture->img)
 	{
+		printf("deu ruim aqui\n");
 		free(texture);
 		return (NULL);
 	}
