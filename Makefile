@@ -11,12 +11,17 @@ SRCS = $(SRC_DIR)/main.c \
        $(SRC_DIR)/parsing/file_parser.c \
        $(SRC_DIR)/parsing/map_parser.c \
        $(SRC_DIR)/parsing/texture_parser.c \
+       $(SRC_DIR)/parsing/texture_utils.c \
        $(SRC_DIR)/parsing/validation.c \
+       $(SRC_DIR)/parsing/wall_check.c \
+       $(SRC_DIR)/parsing/init_player.c \
        $(SRC_DIR)/raycasting/raycasting.c \
        $(SRC_DIR)/raycasting/dda.c \
        $(SRC_DIR)/graphics/renderer.c \
        $(SRC_DIR)/graphics/textures.c \
-       $(SRC_DIR)/graphics/image.c \
+       $(SRC_DIR)/graphics/draw_wall.c \
+       $(SRC_DIR)/graphics/minimap.c \
+       $(SRC_DIR)/graphics/minimap_utils.c \
        $(SRC_DIR)/player/movement.c \
        $(SRC_DIR)/player/collision.c \
        $(SRC_DIR)/utils/cleanup.c \
