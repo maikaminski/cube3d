@@ -1,5 +1,18 @@
 #include "../../includes/cube.h"
 
+void free_lines(char **lines)
+{
+	int i = 0;
+	if (!lines)
+		return;
+	while (lines[i])
+	{
+		free(lines[i]);
+		i++;
+	}
+	free(lines);
+}
+
 int	parse_file(char *filename, t_game *game)
 {
 	int		fd;
@@ -24,14 +37,44 @@ int	parse_file(char *filename, t_game *game)
 	}
 	lines[i] = NULL;
 	close(fd);
-	if (!parse_textures(lines, game) || !parse_map(lines, game))
+	// if (!parse_textures(lines, game) || !parse_map(lines, game))
+	// {
+	// 	// Free lines
+	// 	free(lines);
+	// 	return (0);
+	// }
+	// free(lines);
+	// return (validate_map(game));
+	if (!parse_textures(lines, game))
 	{
-		// Free lines
-		free(lines);
+		free_lines(lines);
 		return (0);
 	}
-	free(lines);
-	return (validate_map(game));
+
+	// 3️⃣ Valida texturas carregadas
+	
+	if (!validate_textures(game))
+	{
+		free_lines(lines);
+		return (0);
+	}
+
+	// 4️⃣ Depois parseia o mapa
+	if (!parse_map(lines, game))
+	{
+		free_lines(lines);
+		return (0);
+	}
+
+	// 5️⃣ Mapa válido?
+	if (!validate_map(game))
+	{
+		free_lines(lines);
+		return (0);
+	}
+
+	free_lines(lines);
+	return (1);
 }
 
 int	validate_extension(char *filename)

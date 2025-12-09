@@ -29,6 +29,10 @@
 # define KEY_LEFT 65361
 # define KEY_RIGHT 65363
 
+
+# define KEY_LEFT_IDX 250
+# define KEY_RIGHT_IDX 251
+
 /* Error messages */
 # define ERR_ARGS "Error\nUsage: ./cub3D <map.cub>\n"
 # define ERR_FILE "Error\nCannot open file\n"
@@ -123,6 +127,7 @@ int		parse_textures(char **lines, t_game *game);
 int		parse_color(char *color_str, t_color *color);
 int		validate_map(t_game *game);
 int		validate_extension(char *filename);
+int		validate_textures(t_game *game);
 int		check_walls(t_game *game);
 void	init_player(t_game *game, int y, int x, char direction);
 

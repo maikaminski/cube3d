@@ -34,10 +34,11 @@ void	move_player(t_game *game)
 	if (!check_collision(game, game->player->x, new_y))
 		game->player->y = new_y;
 	
-	if (game->keys[KEY_LEFT % 256])
-		rotate_player(game, ROT_SPEED);
-	if (game->keys[KEY_RIGHT % 256])
-		rotate_player(game, -ROT_SPEED);
+	if (game->keys[KEY_LEFT_IDX])
+	    rotate_player(game, -ROT_SPEED);
+	
+	if (game->keys[KEY_RIGHT_IDX])
+	    rotate_player(game, ROT_SPEED);
 }
 
 void	rotate_player(t_game *game, double angle)

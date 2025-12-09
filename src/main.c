@@ -45,7 +45,17 @@ void	init_game(t_game *game)
 	game->img->addr = mlx_get_data_addr(game->img->img, &game->img->bits_per_pixel,
 			&game->img->line_length, &game->img->endian);
 	game->textures = malloc(sizeof(t_texture));
+	if (!game->textures)
+	    error_exit(ERR_MALLOC);
+		
+	game->textures->north = NULL;
+	game->textures->south = NULL;
+	game->textures->west  = NULL;
+	game->textures->east  = NULL;
+		
 	game->player = malloc(sizeof(t_player));
+	if (!game->player)
+    error_exit(ERR_MALLOC);
 	i = 0;
 	while (i < 256)
 		game->keys[i++] = 0;
