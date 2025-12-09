@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   cube.h                                             :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: mkaminski <mkaminski@student.42.fr>      +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/12/09 00:00:00 by mkaminski         #+#    #+#             */
+/*   Updated: 2025/12/09 00:00:00 by mkaminski        ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #ifndef CUBE_H
 # define CUBE_H
 
@@ -7,6 +19,7 @@
 # include <math.h>
 # include <fcntl.h>
 # include <string.h>
+# include <errno.h>
 # include "../libft/libft.h"
 # include "../minilibx-linux/mlx.h"
 
@@ -17,10 +30,8 @@
 # define FOV 60
 # define MOVE_SPEED 0.05
 # define ROT_SPEED 0.03
-/* Player collision radius (in map units) - prevents player from getting too close to walls */
 # define PLAYER_RADIUS 0.2
 
-/* Key codes for Linux */
 # define KEY_ESC 65307
 # define KEY_W 119
 # define KEY_A 97
@@ -28,8 +39,13 @@
 # define KEY_D 100
 # define KEY_LEFT 65361
 # define KEY_RIGHT 65363
+# define KEY_LEFT_IDX 250
+# define KEY_RIGHT_IDX 251
 
-/* Error messages */
+# define MINIMAP_SIZE 200
+# define MINIMAP_TILE_SIZE 10
+# define MINIMAP_MARGIN 10
+
 # define ERR_ARGS "Error\nUsage: ./cub3D <map.cub>\n"
 # define ERR_FILE "Error\nCannot open file\n"
 # define ERR_EXT "Error\nFile must have .cub extension\n"
@@ -123,7 +139,11 @@ int		parse_textures(char **lines, t_game *game);
 int		parse_color(char *color_str, t_color *color);
 int		validate_map(t_game *game);
 int		validate_extension(char *filename);
+int		validate_textures(t_game *game);
 int		check_walls(t_game *game);
+int		check_top_bottom_walls(t_game *game);
+int		check_side_walls(t_game *game);
+void	parse_config_line(char **lines, int i, t_game *game, int *found);
 void	init_player(t_game *game, int y, int x, char direction);
 
 /* Raycasting functions */
@@ -141,6 +161,14 @@ void	put_pixel(t_img *img, int x, int y, int color);
 t_img	*load_texture(t_game *game, char *path);
 int		get_texture_color(t_img *texture, int x, int y);
 
+/* Minimap functions */
+void	draw_minimap(t_game *game);
+void	draw_minimap_tile(t_game *game, int x, int y, int color);
+void	draw_minimap_player(t_game *game);
+void	draw_minimap_background(t_game *game);
+int		get_tile_color(t_game *game, int map_y, int map_x);
+void	draw_map_row(t_game *game, int map_y);
+
 /* Player functions */
 void	move_player(t_game *game);
 void	rotate_player(t_game *game, double angle);
@@ -155,7 +183,6 @@ int		close_window(t_game *game);
 void	cleanup_game(t_game *game);
 void	cleanup_texture(t_game *game, t_img *texture);
 void	error_exit(char *message);
-double	deg_to_rad(double degrees);
 int		create_rgb(int r, int g, int b);
 
 #endif

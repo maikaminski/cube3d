@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   main.c                                             :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: mkaminski <mkaminski@student.42.fr>      +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/12/09 00:00:00 by mkaminski         #+#    #+#             */
+/*   Updated: 2025/12/09 00:00:00 by mkaminski        ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "../includes/cube.h"
 
 int	main(int argc, char **argv)
@@ -17,8 +29,6 @@ int	main(int argc, char **argv)
 	init_game(&game);
 	if (!parse_file(argv[1], &game))
 	{
-		/* Provide a clear message when parsing/validation fails so the
-		   user understands why the window closes immediately. */
 		printf(ERR_MAP);
 		cleanup_game(&game);
 		return (1);
@@ -28,27 +38,47 @@ int	main(int argc, char **argv)
 	return (0);
 }
 
-void	init_game(t_game *game)
+static void	init_textures(t_game *game)
+{
+	game->textures = malloc(sizeof(t_texture));
+	if (!game->textures)
+		error_exit(ERR_MALLOC);
+	game->textures->north = NULL;
+	game->textures->south = NULL;
+	game->textures->west = NULL;
+	game->textures->east = NULL;
+}
+
+static void	init_keys(t_game *game)
 {
 	int	i;
 
+	i = 0;
+	while (i < 256)
+		game->keys[i++] = 0;
+}
+
+void	init_game(t_game *game)
+{
 	game->mlx = mlx_init();
 	if (!game->mlx)
 		error_exit(ERR_MALLOC);
-	game->win = mlx_new_window(game->mlx, WINDOW_WIDTH, WINDOW_HEIGHT, "Cub3D");
+	game->win = mlx_new_window(game->mlx, WINDOW_WIDTH,
+			WINDOW_HEIGHT, "Cub3D");
 	if (!game->win)
 		error_exit(ERR_MALLOC);
 	game->img = malloc(sizeof(t_img));
 	if (!game->img)
 		error_exit(ERR_MALLOC);
 	game->img->img = mlx_new_image(game->mlx, WINDOW_WIDTH, WINDOW_HEIGHT);
-	game->img->addr = mlx_get_data_addr(game->img->img, &game->img->bits_per_pixel,
-			&game->img->line_length, &game->img->endian);
-	game->textures = malloc(sizeof(t_texture));
+	game->img->addr = mlx_get_data_addr(game->img->img,
+			&game->img->bits_per_pixel, &game->img->line_length,
+			&game->img->endian);
+	init_textures(game);
 	game->player = malloc(sizeof(t_player));
-	i = 0;
-	while (i < 256)
-		game->keys[i++] = 0;
+	if (!game->player)
+		error_exit(ERR_MALLOC);
+	init_keys(game);
 }
 
 void	game_loop(t_game *game)

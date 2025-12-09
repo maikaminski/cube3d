@@ -1,44 +1,41 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   texture_parser.c                                   :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: mkaminski <mkaminski@student.42.fr>      +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/12/09 00:00:00 by mkaminski         #+#    #+#             */
+/*   Updated: 2025/12/09 00:00:00 by mkaminski        ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "../../includes/cube.h"
+
+int	validate_textures(t_game *game)
+{
+	if (!game->textures->north || !game->textures->south
+		|| !game->textures->west || !game->textures->east)
+	{
+		error_exit("Failed to load textures");
+		return (0);
+	}
+	return (1);
+}
 
 int	parse_textures(char **lines, t_game *game)
 {
-	int	i;
-	char *path;
+	int		i;
+	int		found;
 
 	i = 0;
-	while (lines[i])
+	found = 0;
+	while (lines[i] && found < 6)
 	{
-		if (ft_strncmp(lines[i], "NO ", 3) == 0)
-		{
-			path = ft_strtrim(lines[i] + 3, " \n");
-			game->textures->north = load_texture(game, path);
-			free(path);
-		}
-		else if (ft_strncmp(lines[i], "SO ", 3) == 0)
-		{
-			path = ft_strtrim(lines[i] + 3, " \n");
-			game->textures->south = load_texture(game, path);
-			free(path);
-		}
-		else if (ft_strncmp(lines[i], "WE ", 3) == 0)
-		{
-			path = ft_strtrim(lines[i] + 3, " \n");
-			game->textures->west = load_texture(game, path);
-			free(path);
-		}
-		else if (ft_strncmp(lines[i], "EA ", 3) == 0)
-		{
-			path = ft_strtrim(lines[i] + 3, " \n");
-			game->textures->east = load_texture(game, path);
-			free(path);
-		}
-		else if (ft_strncmp(lines[i], "F ", 2) == 0)
-			parse_color(lines[i] + 2, &game->floor_color);
-		else if (ft_strncmp(lines[i], "C ", 2) == 0)
-			parse_color(lines[i] + 2, &game->ceiling_color);
+		parse_config_line(lines, i, game, &found);
 		i++;
 	}
-	return (1);
+	return (found == 6);
 }
 
 int	parse_color(char *color_str, t_color *color)
@@ -52,16 +49,11 @@ int	parse_color(char *color_str, t_color *color)
 	color->r = ft_atoi(rgb[0]);
 	color->g = ft_atoi(rgb[1]);
 	color->b = ft_atoi(rgb[2]);
-	
-	// Validate RGB values
-	if (color->r < 0 || color->r > 255 || 
-		color->g < 0 || color->g > 255 || 
-		color->b < 0 || color->b > 255)
+	if (color->r < 0 || color->r > 255
+		|| color->g < 0 || color->g > 255
+		|| color->b < 0 || color->b > 255)
 		return (0);
-		
 	color->hex = create_rgb(color->r, color->g, color->b);
-	
-	// Free rgb array
 	i = 0;
 	while (rgb[i])
 	{

@@ -1,0 +1,1551 @@
+================================================================================
+                    CUB3D - DOCUMENTAÇÃO COMPLETA
+                    Explicação Detalhada de Todas as Funções
+================================================================================
+
+📚 VISÃO GERAL DO PROJETO
+================================================================================
+
+O **cub3D** é um motor de raycasting 3D inspirado no jogo Wolfenstein 3D. 
+Ele cria uma visão em primeira pessoa de um labirinto 2D, renderizando 
+paredes texturizadas em 3D usando a técnica de raycasting.
+
+================================================================================
+📁 ESTRUTURA DE ARQUIVOS
+================================================================================
+
+src/
+├── main.c                      # Ponto de entrada e inicialização
+├── parsing/                    # Leitura e validação do arquivo .cub
+│   ├── file_parser.c          # Parser principal do arquivo
+│   ├── map_parser.c           # Parser específico do mapa
+│   ├── texture_parser.c       # Parser de texturas e cores
+│   ├── texture_utils.c        # Funções auxiliares de parsing
+│   ├── validation.c           # Validação do mapa
+│   ├── wall_check.c          # Verificação de paredes
+│   └── init_player.c         # Inicialização do jogador
+├── raycasting/                # Motor de raycasting
+│   ├── raycasting.c          # Algoritmo principal
+│   └── dda.c                 # Digital Differential Analysis
+├── graphics/                  # Renderização
+│   ├── renderer.c            # Renderizador principal
+│   ├── draw_wall.c          # Desenho de paredes
+│   ├── textures.c           # Carregamento de texturas
+│   ├── minimap.c            # Minimapa (bonus)
+│   └── minimap_utils.c      # Utilidades do minimapa
+├── player/                   # Controles do jogador
+│   ├── movement.c           # Movimentação
+│   └── collision.c          # Detecção de colisão
+└── utils/                   # Utilitários gerais
+    ├── cleanup.c           # Limpeza de memória
+    ├── error.c            # Tratamento de erros
+    └── math_utils.c       # Funções matemáticas
+
+================================================================================
+🚀 1. MAIN.C - Ponto de Entrada
+================================================================================
+
+--------------------------------------------------------------------------------
+int main(int argc, char **argv)
+--------------------------------------------------------------------------------
+PROPÓSITO: Função principal que inicia o programa
+
+FUNCIONAMENTO DETALHADO:
+1. Valida argumentos (linha 17-22):
+   - Verifica se foi passado exatamente 1 argumento (o arquivo .cub)
+   - Se não, imprime erro e retorna 1
+   
+2. Valida extensão (linha 23-27):
+   - Chama validate_extension() para verificar se o arquivo termina em .cub
+   - Se inválido, imprime erro e retorna 1
+
+3. Inicializa estrutura do jogo (linha 28):
+   - Chama init_game() para alocar e preparar todas as estruturas necessárias
+   - Inicializa MLX, janela, imagens, texturas, jogador
+
+4. Faz parsing do arquivo (linha 29-34):
+   - Chama parse_file() para ler e processar o arquivo .cub
+   - Se falhar, limpa memória e retorna 1
+
+5. Inicia loop do jogo (linha 35):
+   - Chama game_loop() que configura hooks e inicia loop infinito
+
+6. Cleanup (linha 36):
+   - Após o loop terminar (janela fechada), limpa toda a memória alocada
+
+--------------------------------------------------------------------------------
+static void init_textures(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Inicializa a estrutura de texturas
+
+FUNCIONAMENTO:
+1. Aloca memória para t_texture (4 ponteiros para imagens)
+2. Inicializa todos os ponteiros como NULL
+3. Se falhar alocação, chama error_exit()
+
+--------------------------------------------------------------------------------
+static void init_keys(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Inicializa array de teclas pressionadas
+
+FUNCIONAMENTO:
+1. Percorre array de 256 posições (uma para cada código de tecla)
+2. Define todas como 0 (não pressionada)
+3. Usado depois para controles: game->keys[KEY_W] retorna 1 se W está pressionado
+
+--------------------------------------------------------------------------------
+void init_game(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Inicializa todas as estruturas principais do jogo
+
+FUNCIONAMENTO DETALHADO:
+1. Inicializa MLX (linha 61-63):
+   - mlx_init() cria conexão com o servidor X11
+   - Se falhar, termina programa
+
+2. Cria janela (linha 64-67):
+   - mlx_new_window() cria janela de 1024x768 pixels
+   - Título: "Cub3D"
+
+3. Cria buffer de imagem (linha 68-75):
+   - Aloca estrutura t_img
+   - mlx_new_image() cria buffer onde vamos desenhar
+   - mlx_get_data_addr() obtém ponteiro direto para os pixels
+   - Isso permite modificar pixels diretamente na memória
+
+4. Inicializa texturas (linha 76):
+   - Chama init_textures() para preparar estrutura
+
+5. Aloca jogador (linha 77-79):
+   - Aloca memória para estrutura t_player
+   - Posição, direção e plano de câmera serão definidos depois
+
+6. Inicializa controles (linha 80):
+   - Chama init_keys() para zerar array de teclas
+
+--------------------------------------------------------------------------------
+void game_loop(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Configura hooks de eventos e inicia loop principal
+
+FUNCIONAMENTO:
+1. Hook de tecla pressionada (linha 85):
+   - mlx_hook(..., 2, ...) - Evento KeyPress
+   - Quando tecla é pressionada, chama key_press()
+
+2. Hook de tecla solta (linha 86):
+   - mlx_hook(..., 3, ...) - Evento KeyRelease
+   - Quando tecla é solta, chama key_release()
+
+3. Hook de fechar janela (linha 87):
+   - mlx_hook(..., 17, ...) - Evento DestroyNotify
+   - Quando clica no X da janela, chama close_window()
+
+4. Hook de renderização (linha 88):
+   - mlx_loop_hook() - Chamado continuamente
+   - Chama render_frame() a cada frame (~60 FPS)
+
+5. Inicia loop (linha 89):
+   - mlx_loop() - Loop infinito que processa eventos
+   - Só termina quando janela é fechada
+
+================================================================================
+📖 2. PARSING - Leitura do Arquivo .cub
+================================================================================
+
+--------------------------------------------------------------------------------
+FILE_PARSER.C
+--------------------------------------------------------------------------------
+
+static void free_lines(char **lines)
+--------------------------------------------------------------------------------
+PROPÓSITO: Libera array de strings
+
+FUNCIONAMENTO:
+1. Verifica se lines não é NULL
+2. Percorre cada string e libera com free()
+3. Libera o array principal
+
+--------------------------------------------------------------------------------
+static char **read_lines(int fd)
+--------------------------------------------------------------------------------
+PROPÓSITO: Lê todas as linhas do arquivo
+
+FUNCIONAMENTO:
+1. Aloca array para 1000 linhas (máximo)
+2. Loop usando get_next_line():
+   - Lê linha por linha
+   - Armazena cada linha no array
+   - Para quando retorna NULL (fim do arquivo)
+3. Adiciona NULL no final do array
+4. Retorna array de strings
+
+--------------------------------------------------------------------------------
+static int validate_all(char **lines, t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Valida todo o conteúdo do arquivo
+
+FUNCIONAMENTO SEQUENCIAL:
+1. Parse texturas (linha 55-60):
+   - Chama parse_textures() para extrair NO, SO, WE, EA, F, C
+   - Se falhar, libera linhas e retorna 0
+
+2. Valida texturas (linha 61-65):
+   - Verifica se todas as 4 texturas foram carregadas
+   - Se falhar, libera e retorna 0
+
+3. Parse mapa (linha 66-70):
+   - Chama parse_map() para extrair o mapa 2D
+   - Se falhar, libera e retorna 0
+
+4. Valida mapa (linha 71-75):
+   - Verifica se mapa é válido (fechado, 1 jogador, etc.)
+   - Se falhar, libera e retorna 0
+
+5. Retorna 1 se tudo passar
+
+--------------------------------------------------------------------------------
+int parse_file(char *filename, t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Função principal que coordena o parsing
+
+FUNCIONAMENTO:
+1. Abre arquivo (linha 80):
+   - open() em modo leitura
+   - Se falhar, termina com erro
+
+2. Lê todas as linhas (linha 86):
+   - Chama read_lines() para carregar arquivo na memória
+
+3. Fecha arquivo (linha 87):
+   - Não precisa mais do fd, fecha imediatamente
+
+4. Valida conteúdo (linha 88):
+   - Chama validate_all() que faz todo o processamento
+
+5. Cleanup (linha 89):
+   - Libera array de linhas
+
+6. Retorna resultado da validação
+
+--------------------------------------------------------------------------------
+int validate_extension(char *filename)
+--------------------------------------------------------------------------------
+PROPÓSITO: Verifica se arquivo termina em .cub
+
+FUNCIONAMENTO:
+1. Calcula tamanho do nome
+2. Se menor que 4 caracteres, retorna 0
+3. Compara últimos 4 caracteres com ".cub"
+4. Retorna 1 se igual, 0 se diferente
+
+--------------------------------------------------------------------------------
+MAP_PARSER.C
+--------------------------------------------------------------------------------
+
+static int is_blank_line(char *line)
+--------------------------------------------------------------------------------
+PROPÓSITO: Verifica se linha contém apenas espaços em branco
+
+FUNCIONAMENTO:
+1. Percorre cada caractere
+2. Verifica se é espaço, tab, newline ou carriage return
+3. Retorna 1 se linha está vazia, 0 se tem conteúdo
+
+--------------------------------------------------------------------------------
+static int is_config_line(char *line)
+--------------------------------------------------------------------------------
+PROPÓSITO: Identifica se linha é configuração (textura ou cor)
+
+FUNCIONAMENTO:
+1. Verifica se começa com "NO ", "SO ", "WE ", "EA " (texturas)
+2. Ou se começa com "F " ou "C " (cores)
+3. Retorna 1 se for configuração, 0 se não
+
+--------------------------------------------------------------------------------
+static int find_map_start(char **lines)
+--------------------------------------------------------------------------------
+PROPÓSITO: Encontra onde o mapa começa no arquivo
+
+FUNCIONAMENTO:
+1. Começa do índice 0
+2. Pula todas as linhas que são:
+   - Linhas de configuração
+   - Linhas em branco
+3. Retorna índice da primeira linha do mapa
+
+EXEMPLO:
+NO ./texture_north.xpm    <- config, pula
+SO ./texture_south.xpm    <- config, pula
+F 100,100,100             <- config, pula
+                          <- blank, pula
+111111                    <- mapa! retorna este índice
+100001
+
+--------------------------------------------------------------------------------
+static void copy_map_lines(char **lines, t_game *game, int map_start)
+--------------------------------------------------------------------------------
+PROPÓSITO: Copia linhas do mapa para estrutura do jogo
+
+FUNCIONAMENTO:
+1. Loop de 0 até map_height
+2. Para cada linha, faz ft_strdup() para copiar
+3. Armazena em game->map[i]
+4. Adiciona NULL no final
+
+--------------------------------------------------------------------------------
+int parse_map(char **lines, t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Extrai e processa o mapa do arquivo
+
+FUNCIONAMENTO DETALHADO:
+1. Encontra início (linha 59):
+   - Chama find_map_start() para achar primeira linha do mapa
+
+2. Calcula altura (linha 60-63):
+   - Conta quantas linhas existem do início até o fim
+   - map_height = número de linhas do mapa
+
+3. Calcula largura (linha 64-70):
+   - Percorre todas as linhas do mapa
+   - Encontra a linha mais longa
+   - map_width = tamanho da maior linha
+
+4. Aloca memória (linha 71-73):
+   - Aloca array de ponteiros (map_height + 1)
+   - +1 para NULL no final
+
+5. Copia linhas (linha 74):
+   - Chama copy_map_lines() para copiar mapa
+
+POR QUE PRECISAMOS DE MAP_WIDTH?
+- Mapas podem ter linhas de tamanhos diferentes
+- Precisamos saber o tamanho máximo para validação
+
+--------------------------------------------------------------------------------
+TEXTURE_PARSER.C
+--------------------------------------------------------------------------------
+
+int validate_textures(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Verifica se todas as 4 texturas foram carregadas
+
+FUNCIONAMENTO:
+1. Verifica se algum ponteiro é NULL
+2. Se algum for NULL, erro
+3. Retorna 1 se todas existem
+
+--------------------------------------------------------------------------------
+int parse_textures(char **lines, t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Processa todas as linhas de configuração
+
+FUNCIONAMENTO:
+1. Inicializa contador found = 0 (precisa encontrar 6: NO, SO, WE, EA, F, C)
+2. Loop pelas linhas enquanto found < 6
+3. Para cada linha, chama parse_config_line() que:
+   - Identifica tipo da linha
+   - Processa apropriadamente
+   - Incrementa found se válida
+4. Retorna 1 se encontrou todas as 6
+
+--------------------------------------------------------------------------------
+int parse_color(char *color_str, t_color *color)
+--------------------------------------------------------------------------------
+PROPÓSITO: Converte string "R,G,B" em estrutura de cor
+
+FUNCIONAMENTO DETALHADO:
+1. Split (linha 39):
+   - ft_split(color_str, ',') divide em ["R", "G", "B"]
+
+2. Valida formato (linha 40-41):
+   - Verifica se tem exatamente 3 componentes
+   - Se não, retorna 0
+
+3. Converte para inteiros (linha 42-44):
+   - ft_atoi() em cada componente
+   - Armazena em color->r, color->g, color->b
+
+4. Valida range (linha 45-48):
+   - Cada componente deve estar entre 0-255
+   - Se fora do range, retorna 0
+
+5. Cria hex (linha 49):
+   - create_rgb() combina R,G,B em um único int
+   - Formato: 0xRRGGBB
+   - Exemplo: R=255, G=100, B=50 → 0xFF6432
+
+6. Libera memória (linha 50-55):
+   - Libera cada string do split
+   - Libera array principal
+
+EXEMPLO:
+Input: "100,150,200"
+Split: ["100", "150", "200"]
+Convert: r=100, g=150, b=200
+Hex: 0x6496C8
+
+--------------------------------------------------------------------------------
+VALIDATION.C
+--------------------------------------------------------------------------------
+
+static int check_char_valid(t_game *game, int i, int j, int *player_count)
+--------------------------------------------------------------------------------
+PROPÓSITO: Valida cada caractere do mapa
+
+FUNCIONAMENTO:
+1. Verifica se é jogador (linha 16-21):
+   - Se caractere é N, S, E ou W
+   - Incrementa contador de jogadores
+   - Chama init_player() para inicializar posição e direção
+   - Retorna 1 (válido)
+
+2. Verifica outros caracteres (linha 22-29):
+   - Caracteres válidos: '0', '1', ' ', '\n', '\t', '\r'
+   - Se for inválido, imprime erro detalhado com posição
+   - Retorna 0 (inválido)
+
+3. Retorna 1 se caractere é válido
+
+--------------------------------------------------------------------------------
+int validate_map(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Valida todo o mapa
+
+FUNCIONAMENTO DETALHADO:
+1. Inicializa (linha 35):
+   - player_count = 0 para contar jogadores
+
+2. Loop duplo (linha 36-46):
+   - Percorre cada linha (i) e cada coluna (j)
+   - Para cada caractere, chama check_char_valid()
+   - Se retornar 0, para e retorna 0
+
+3. Valida número de jogadores (linha 47-52):
+   - Deve ter EXATAMENTE 1 jogador
+   - Se 0 ou >1, imprime erro e retorna 0
+
+4. Valida paredes (linha 53):
+   - Chama check_walls() para verificar se mapa é fechado
+   - Retorna resultado
+
+POR QUE EXATAMENTE 1 JOGADOR?
+- 0 jogadores: não há onde começar
+- >1 jogadores: ambiguidade de spawn
+
+--------------------------------------------------------------------------------
+int check_walls(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Verifica se mapa está cercado por paredes
+
+FUNCIONAMENTO:
+1. Verifica paredes superior e inferior com check_top_bottom_walls()
+2. Verifica paredes laterais com check_side_walls()
+3. Retorna 1 apenas se ambos passarem
+
+--------------------------------------------------------------------------------
+WALL_CHECK.C
+--------------------------------------------------------------------------------
+
+static int check_top_wall(t_game *game, int i)
+--------------------------------------------------------------------------------
+PROPÓSITO: Verifica se a primeira linha do mapa está fechada na posição i
+
+FUNCIONAMENTO:
+1. Verifica se índice i existe na primeira linha
+2. Checa se o caractere é válido para borda (deve ser '1' ou espaço)
+3. Se for '0' ou outro inválido, imprime erro detalhado
+4. Retorna 0 se inválido, 1 se válido
+
+POR QUE ACEITAR ESPAÇOS?
+   111
+  10001    <- Espaços antes são válidos (fora do mapa)
+  11111
+
+--------------------------------------------------------------------------------
+static int check_bottom_wall(t_game *game, int i)
+--------------------------------------------------------------------------------
+PROPÓSITO: Verifica se a última linha do mapa está fechada na posição i
+
+FUNCIONAMENTO:
+1. Calcula row = map_height - 1 (última linha)
+2. Mesma lógica que check_top_wall() mas para linha inferior
+3. Retorna 0 se inválido, 1 se válido
+
+--------------------------------------------------------------------------------
+int check_top_bottom_walls(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Valida que topo e fundo estão completamente fechados
+
+FUNCIONAMENTO:
+1. Loop de 0 até map_width
+2. Para cada coluna i:
+   - Verifica topo com check_top_wall()
+   - Verifica fundo com check_bottom_wall()
+3. Se qualquer falhar, retorna 0
+4. Retorna 1 se todos passarem
+
+VISUALIZAÇÃO:
+111111    <- Verifica cada posição desta linha
+100001
+100N01
+111111    <- E cada posição desta linha
+
+--------------------------------------------------------------------------------
+static int check_right_edge(t_game *game, int i)
+--------------------------------------------------------------------------------
+PROPÓSITO: Verifica se o lado direito da linha i está fechado
+
+FUNCIONAMENTO:
+1. Pega último caractere da linha i
+2. Verifica se é '1' ou espaço
+3. Se não, erro e retorna 0
+4. Retorna 1 se válido
+
+--------------------------------------------------------------------------------
+int check_side_walls(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Valida que laterais esquerda e direita estão fechadas
+
+FUNCIONAMENTO:
+1. Loop por cada linha do mapa
+2. Para cada linha:
+   - Esquerda: Verifica se primeiro caractere é '1' ou espaço
+   - Direita: Chama check_right_edge()
+3. Se qualquer falhar, retorna 0
+4. Retorna 1 se todos passarem
+
+VISUALIZAÇÃO:
+1        <- Verifica primeiro char
+1        <- De cada linha
+1
+1        <- Até a última
+
+--------------------------------------------------------------------------------
+INIT_PLAYER.C
+--------------------------------------------------------------------------------
+
+static void init_player_dir_ns(t_game *game, char direction)
+--------------------------------------------------------------------------------
+PROPÓSITO: Inicializa direção e plano de câmera para Norte/Sul
+
+FUNCIONAMENTO DETALHADO:
+
+SE DIRECTION == 'N' (Norte):
+- dir_x = 0, dir_y = -1: Olhando para cima (Y negativo)
+- plane_x = 0.66, plane_y = 0: Plano de câmera perpendicular
+- FOV de ~66 graus (0.66 radianos)
+
+SE DIRECTION == 'S' (Sul):
+- dir_x = 0, dir_y = 1: Olhando para baixo (Y positivo)
+- plane_x = -0.66, plane_y = 0: Plano invertido
+
+O QUE É O PLANO DE CÂMERA?
+- Vetor perpendicular à direção de visão
+- Define o campo de visão (FOV)
+- Maior valor = FOV mais amplo
+
+DIAGRAMA:
+       plane
+      ←--→
+      |  |
+      |  | dir (Norte)
+      ↑  |
+    Player
+
+--------------------------------------------------------------------------------
+static void init_player_dir_ew(t_game *game, char direction)
+--------------------------------------------------------------------------------
+PROPÓSITO: Inicializa direção e plano de câmera para Leste/Oeste
+
+SE DIRECTION == 'E' (Leste):
+- dir_x = 1, dir_y = 0: Olhando para direita
+- plane_x = 0, plane_y = 0.66
+
+SE DIRECTION == 'W' (Oeste):
+- dir_x = -1, dir_y = 0: Olhando para esquerda
+- plane_x = 0, plane_y = -0.66
+
+--------------------------------------------------------------------------------
+void init_player(t_game *game, int y, int x, char direction)
+--------------------------------------------------------------------------------
+PROPÓSITO: Configura posição e orientação inicial do jogador
+
+FUNCIONAMENTO:
+1. Define posição (linha 52-53):
+   - x + 0.5, y + 0.5: Centro da célula
+   - Exemplo: célula (5,3) → posição (5.5, 3.5)
+
+2. Define direção (linha 54-55):
+   - Chama ambas as funções (mas apenas uma fará algo)
+   - init_player_dir_ns() para N ou S
+   - init_player_dir_ew() para E ou W
+
+POR QUE +0.5?
+[0,0]  [1,0]  [2,0]
+  +------+------+
+  |      |      |
+  |  *   |      |  <- Player em (0.5, 0.5) = centro da célula
+  +------+------+
+[0,1]  [1,1]  [2,1]
+
+--------------------------------------------------------------------------------
+TEXTURE_UTILS.C
+--------------------------------------------------------------------------------
+
+static void parse_texture_line(char **lines, int i, t_game *game, int *found)
+--------------------------------------------------------------------------------
+PROPÓSITO: Processa linhas de textura Norte e Sul
+
+FUNCIONAMENTO:
+1. Norte (linha 18-24):
+   - Se linha começa com "NO "
+   - Remove espaços/newlines do caminho com ft_strtrim()
+   - Carrega textura com load_texture()
+   - Libera string temporária
+   - Incrementa contador
+
+2. Sul (linha 25-31):
+   - Mesma lógica para "SO "
+
+EXEMPLO DE LINHA:
+NO ./textures/wall_north.xpm\n
+   ^^^^^^^^^^^^^^^^^^^^^^^    <- Este path é extraído e limpo
+
+--------------------------------------------------------------------------------
+static void parse_texture_line2(char **lines, int i, t_game *game, int *found)
+--------------------------------------------------------------------------------
+PROPÓSITO: Processa linhas de textura Oeste e Leste
+
+FUNCIONAMENTO:
+- Mesma lógica que parse_texture_line() mas para:
+  - "WE " → textura oeste
+  - "EA " → textura leste
+
+POR QUE DUAS FUNÇÕES?
+- Limitação da Norminette: máximo 25 linhas por função
+- Dividir em duas mantém conformidade
+
+--------------------------------------------------------------------------------
+void parse_config_line(char **lines, int i, t_game *game, int *found)
+--------------------------------------------------------------------------------
+PROPÓSITO: Roteador principal que processa todas as linhas de configuração
+
+FUNCIONAMENTO:
+1. Texturas (linha 51-52):
+   - Chama parse_texture_line() e parse_texture_line2()
+   - Cada uma checa seus tipos específicos
+
+2. Cor do chão (linha 53-57):
+   - Se linha começa com "F "
+   - Chama parse_color() para converter RGB
+   - Incrementa contador
+
+3. Cor do teto (linha 58-62):
+   - Se linha começa com "C "
+   - Mesma lógica para teto
+
+EXEMPLO DE ARQUIVO .CUB:
+NO ./north.xpm    <- parse_texture_line processa
+SO ./south.xpm    <- parse_texture_line processa
+WE ./west.xpm     <- parse_texture_line2 processa
+EA ./east.xpm     <- parse_texture_line2 processa
+F 100,100,100     <- Esta função processa
+C 50,150,200      <- Esta função processa
+
+================================================================================
+🎮 4. RAYCASTING - Motor de Renderização 3D
+================================================================================
+
+--------------------------------------------------------------------------------
+RAYCASTING.C
+--------------------------------------------------------------------------------
+
+void raycasting(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Loop principal que renderiza todos os raios da tela
+
+FUNCIONAMENTO DETALHADO:
+1. Loop por coluna (linha 19):
+   - x vai de 0 a WINDOW_WIDTH (1024 pixels)
+   - Cada coluna = 1 raio
+
+2. Para cada raio:
+   - Inicializa (linha 21): init_ray() calcula direção
+   - Lança (linha 22): perform_dda() encontra parede
+   - Calcula distância (linha 23): calculate_wall_distance()
+   - Desenha (linha 24): draw_wall() renderiza coluna
+
+VISUALIZAÇÃO:
+Tela:  |  |  |  |  |  |  |
+       ↓  ↓  ↓  ↓  ↓  ↓  ↓
+       Raios disparados
+
+--------------------------------------------------------------------------------
+void init_ray(t_ray *ray, t_player *player, int x)
+--------------------------------------------------------------------------------
+PROPÓSITO: Configura um raio para a coluna x da tela
+
+FUNCIONAMENTO MATEMÁTICO:
+
+1. Camera X (linha 28):
+   camera_x = 2 * x / WINDOW_WIDTH - 1
+   - Converte pixel X (0 a 1024) em range (-1 a 1)
+   - -1 = esquerda, 0 = centro, 1 = direita
+
+2. Direção do raio (linha 29-30):
+   ray_dir_x = dir_x + plane_x * camera_x
+   ray_dir_y = dir_y + plane_y * camera_x
+   - Combina direção de visão com plano de câmera
+   - camera_x varia ao longo do plano
+
+3. Posição inicial (linha 31-32):
+   - Começa na posição do jogador (inteiro)
+   - (int)player->x trunca para célula do grid
+
+4. Delta distances (linha 33-38):
+   delta_dist_x = |1 / ray_dir_x|
+   delta_dist_y = |1 / ray_dir_y|
+   - Distância que o raio percorre para atravessar 1 célula
+   - Se ray_dir = 0, usa 1e30 (infinito)
+
+DIAGRAMA DO RAIO:
+     Plano de câmera
+    ←----------------→
+    |                |
+    |    camera_x    |
+    |  ↙          ↘  |
+    Player → dir_x, dir_y
+         ↘
+          Ray para pixel X
+
+--------------------------------------------------------------------------------
+void calculate_wall_distance(t_ray *ray, t_player *player)
+--------------------------------------------------------------------------------
+PROPÓSITO: Calcula distância perpendicular até a parede e altura da linha
+
+FUNCIONAMENTO:
+
+1. Distância perpendicular (linha 44-49):
+   if (ray->side == 0)  // Parede vertical (X)
+       perp_wall_dist = (map_x - player->x + (1 - step_x) / 2) / ray_dir_x
+   else  // Parede horizontal (Y)
+       perp_wall_dist = (map_y - player->y + (1 - step_y) / 2) / ray_dir_y
+   
+   POR QUE PERPENDICULAR?
+   - Evita efeito "olho de peixe"
+   - Distância real do raio causaria distorção nas bordas
+
+2. Proteção contra divisão por zero (linha 50-51):
+   - Se distância ≤ 0, define como muito pequeno (1e-6)
+
+3. Altura da linha (linha 52):
+   line_height = WINDOW_HEIGHT / perp_wall_dist
+   - Quanto mais longe, menor a linha
+   - Exemplo: dist=1 → height=768, dist=2 → height=384
+
+4. Limites de desenho (linha 53-58):
+   - draw_start: onde começar a desenhar (pode ser negativo)
+   - draw_end: onde parar
+   - Clamp para não desenhar fora da tela
+
+VISUALIZAÇÃO:
+     0 ←─────────────→ WINDOW_HEIGHT (768)
+     |                |
+     |   draw_start   |
+     |   ╔═══════╗    |  ← Parede renderizada
+     |   ╚═══════╝    |
+     |    draw_end    |
+     |                |
+
+--------------------------------------------------------------------------------
+DDA.C (Digital Differential Analysis)
+--------------------------------------------------------------------------------
+
+void perform_dda(t_ray *ray, t_player *player, char **map)
+--------------------------------------------------------------------------------
+PROPÓSITO: Algoritmo que "caminha" pelo grid até encontrar uma parede
+
+FUNCIONAMENTO DO ALGORITMO DDA:
+
+1. Inicialização (linha 17):
+   - calculate_step_and_side_dist() prepara distâncias
+
+2. Loop até hit (linha 18-32):
+   while (ray->hit == 0)
+   - Para quando encontrar parede ('1')
+
+3. Escolhe direção (linha 20-31):
+   - Se side_dist_x < side_dist_y: avança em X
+     * Incrementa side_dist_x por delta_dist_x
+     * Move map_x por step_x (-1 ou +1)
+     * Marca side = 0 (parede vertical)
+   
+   - Senão: avança em Y
+     * Incrementa side_dist_y por delta_dist_y
+     * Move map_y por step_y
+     * Marca side = 1 (parede horizontal)
+
+4. Verifica hit (linha 32-33):
+   - Se célula atual é '1', marca hit = 1
+
+VISUALIZAÇÃO DO CAMINHO DO RAIO:
+Grid:
+  0   1   2   3
+0 [1] [1] [1] [1]
+1 [1] [P] [0] [1]
+2 [1] [0] [0] [1]
+3 [1] [1] [1] [1]
+
+Raio:  P → → → 1
+      (1,1) (2,1) (3,1)
+       ↓     ↓     ↓ HIT!
+    Passo  Passo  Parede
+
+--------------------------------------------------------------------------------
+void calculate_step_and_side_dist(t_ray *ray, t_player *player)
+--------------------------------------------------------------------------------
+PROPÓSITO: Calcula direção de passo e distâncias iniciais para DDA
+
+FUNCIONAMENTO PARA X (linha 36-45):
+
+1. Se ray_dir_x < 0 (raio indo para esquerda):
+   - step_x = -1: vai para célula anterior
+   - side_dist_x = (player->x - map_x) * delta_dist_x
+   - Distância até borda esquerda da célula
+
+2. Se ray_dir_x > 0 (raio indo para direita):
+   - step_x = 1: vai para próxima célula
+   - side_dist_x = (map_x + 1.0 - player->x) * delta_dist_x
+   - Distância até borda direita da célula
+
+MESMA LÓGICA PARA Y (linha 46-55)
+
+DIAGRAMA:
+Célula atual:
+   map_x      map_x+1
+     |           |
+     +-----*-----+  <- Player em posição fracionária
+     |    P→     |
+     |           |
+     +-----⚡----+  <- side_dist_x = distância até próxima borda
+           ↑
+       Próxima borda
+
+================================================================================
+🎨 5. GRAPHICS - Renderização Visual
+================================================================================
+
+--------------------------------------------------------------------------------
+RENDERER.C
+--------------------------------------------------------------------------------
+
+int render_frame(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Função chamada a cada frame (~60 FPS)
+
+ORDEM DE RENDERIZAÇÃO:
+1. Move jogador (linha 17):
+   - move_player() atualiza posição baseado em teclas
+
+2. Desenha fundo (linha 18):
+   - draw_background() pinta teto e chão
+
+3. Raycasting (linha 19):
+   - raycasting() desenha todas as paredes
+
+4. Minimap (linha 20):
+   - draw_minimap() adiciona HUD no canto
+
+5. Atualiza tela (linha 21):
+   - mlx_put_image_to_window() mostra buffer na janela
+
+POR QUE ESSA ORDEM?
+- Fundo primeiro (mais distante)
+- Paredes por cima
+- HUD por último (mais próximo)
+
+--------------------------------------------------------------------------------
+void draw_background(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Pinta teto e chão com cores sólidas
+
+FUNCIONAMENTO:
+
+1. Teto (linha 26-36):
+   - Metade superior da tela (0 a HEIGHT/2)
+   - Usa ceiling_color.hex
+   - Loop duplo: cada pixel
+
+2. Chão (linha 37-46):
+   - Metade inferior (HEIGHT/2 a HEIGHT)
+   - Usa floor_color.hex
+   - Loop duplo: cada pixel
+
+RESULTADO VISUAL:
+┌────────────────┐
+│                │ ← Teto (cor C)
+│                │
+├────────────────┤ ← Meio da tela
+│                │
+│                │ ← Chão (cor F)
+└────────────────┘
+
+--------------------------------------------------------------------------------
+void put_pixel(t_img *img, int x, int y, int color)
+--------------------------------------------------------------------------------
+PROPÓSITO: Coloca um pixel colorido na imagem (buffer)
+
+FUNCIONAMENTO:
+
+1. Bounds check (linha 55):
+   - Verifica se (x,y) está dentro da janela
+   - Evita crash por acesso inválido
+
+2. Calcula endereço (linha 57-58):
+   dst = addr + (y * line_length + x * (bits_per_pixel / 8))
+   - addr: ponteiro base do buffer
+   - y * line_length: pula para linha correta
+   - x * (bits_per_pixel / 8): pula para coluna
+   - Normalmente: bits_per_pixel = 32 (4 bytes por pixel)
+
+3. Escreve cor (linha 59):
+   *(unsigned int *)dst = color
+   - Cast para unsigned int* (4 bytes)
+   - Escreve valor hexadecimal (0xRRGGBB)
+
+MEMÓRIA DO BUFFER:
+[R][G][B][A] [R][G][B][A] [R][G][B][A] ...
+ Pixel 0,0    Pixel 1,0    Pixel 2,0
+
+--------------------------------------------------------------------------------
+DRAW_WALL.C
+--------------------------------------------------------------------------------
+
+static t_img *select_texture(t_game *game, t_ray *ray)
+--------------------------------------------------------------------------------
+PROPÓSITO: Escolhe qual textura usar baseado na direção da parede
+
+LÓGICA DE SELEÇÃO:
+
+1. Paredes verticais (side == 0):
+   - Se raio vai para direita (ray_dir_x > 0): textura LESTE
+   - Se raio vai para esquerda: textura OESTE
+
+2. Paredes horizontais (side == 1):
+   - Se raio vai para baixo (ray_dir_y > 0): textura SUL
+   - Se raio vai para cima: textura NORTE
+
+DIAGRAMA:
+        Norte (ray_dir_y < 0)
+            ↑
+            |
+Oeste ←----P----→ Leste
+  (dir_x<0)|  (dir_x>0)
+            ↓
+        Sul (ray_dir_y > 0)
+
+--------------------------------------------------------------------------------
+static void draw_no_texture(t_game *game, t_ray *ray, int x)
+--------------------------------------------------------------------------------
+PROPÓSITO: Fallback caso textura não carregue
+
+FUNCIONAMENTO:
+- Desenha linha vertical branca
+- De draw_start até draw_end
+- Cor 0xFFFFFF (branco puro)
+
+--------------------------------------------------------------------------------
+static void calculate_texture_params(t_ray *ray, t_img *texture, 
+                                     t_player *player, int *tex_x)
+--------------------------------------------------------------------------------
+PROPÓSITO: Calcula qual coluna da textura usar (coordenada X)
+
+FUNCIONAMENTO MATEMÁTICO:
+
+1. Calcula wall_x (linha 51-54):
+   if (side == 0)  // Parede vertical
+       wall_x = player->y + perp_wall_dist * ray_dir_y
+   else           // Parede horizontal
+       wall_x = player->x + perp_wall_dist * ray_dir_x
+   - Posição exata onde raio atingiu a parede
+   - Exemplo: 5.75 (75% ao longo da parede)
+
+2. Parte fracionária (linha 55):
+   wall_x -= floor(wall_x)
+   - Remove parte inteira: 5.75 → 0.75
+   - Agora está entre 0.0 e 1.0
+
+3. Mapeia para textura (linha 56):
+   tex_x = (int)(wall_x * texture->width)
+   - Se texture->width = 64 e wall_x = 0.75
+   - tex_x = 48 (coluna 48 da textura)
+
+4. Inverte se necessário (linha 57-59):
+   - Algumas direções precisam espelhar textura
+   - tex_x = width - tex_x - 1
+
+VISUALIZAÇÃO:
+Parede real:     Textura (64x64):
+   0.0 ... 0.75     0 ... 48
+    |||||||||||||   ||||||||||||
+    ↓ hit aqui      ↓ usa esta coluna
+
+--------------------------------------------------------------------------------
+static void draw_textured_line(t_game *game, t_ray *ray, t_img *texture, int x)
+--------------------------------------------------------------------------------
+PROPÓSITO: Desenha uma coluna vertical texturizada
+
+FUNCIONAMENTO:
+
+1. Calcula tex_x (linha 70):
+   - Chama calculate_texture_params() para coluna da textura
+
+2. Prepara step e posição (linha 71-73):
+   tex_step_pos[0] = texture->height / line_height  // Step
+   tex_step_pos[1] = (draw_start - HEIGHT/2 + line_height/2) * step  // Pos
+   - step: quanto avançar na textura por pixel de tela
+   - pos: posição inicial na textura (pode ser negativa se parede muito perto)
+
+3. Loop de pixels (linha 74-81):
+   - Para cada pixel Y da tela:
+     * Calcula tex_y usando tex_pos
+     * Máscara & (height - 1) garante ficar no range
+     * Pega cor da textura em (tex_x, tex_y)
+     * Desenha pixel
+     * Avança tex_pos por step
+
+VISUALIZAÇÃO:
+Textura (64x64):     Tela:
+┌─────────┐         ┌───┐
+│         │         │   │ draw_start
+│    ↕    │  map    │ ↕ │ Estica/comprime
+│   64px  │  ──→    │200│ baseado em distância
+│         │         │   │ draw_end
+└─────────┘         └───┘
+  tex_x=30            x
+
+--------------------------------------------------------------------------------
+void draw_wall(t_game *game, t_ray *ray, int x)
+--------------------------------------------------------------------------------
+PROPÓSITO: Função principal que coordena desenho da parede
+
+FUNCIONAMENTO:
+1. Seleciona textura apropriada
+2. Se NULL, desenha branco
+3. Senão, desenha linha texturizada
+
+--------------------------------------------------------------------------------
+TEXTURES.C
+--------------------------------------------------------------------------------
+
+static int check_file_exists(char *path)
+--------------------------------------------------------------------------------
+PROPÓSITO: Verifica se arquivo de textura existe antes de carregar
+
+FUNCIONAMENTO:
+1. Tenta abrir arquivo em modo leitura
+2. Se fd < 0, retorna 0 (não existe)
+3. Fecha arquivo imediatamente
+4. Retorna 1 (existe)
+
+POR QUE NÃO APENAS TENTAR CARREGAR?
+- MLX pode crashar se arquivo não existir
+- Melhor validar antes
+
+--------------------------------------------------------------------------------
+t_img *load_texture(t_game *game, char *path)
+--------------------------------------------------------------------------------
+PROPÓSITO: Carrega arquivo XPM como textura
+
+FUNCIONAMENTO DETALHADO:
+
+1. Verifica existência (linha 28-29):
+   - Se arquivo não existe, retorna NULL
+
+2. Aloca estrutura (linha 30-32):
+   - malloc(sizeof(t_img))
+   - Se falhar, retorna NULL
+
+3. Carrega XPM (linha 33-39):
+   mlx_xpm_file_to_image(mlx, path, &width, &height)
+   - MLX lê arquivo XPM
+   - Cria imagem interna
+   - Preenche width e height automaticamente
+   - Se falhar, libera estrutura e retorna NULL
+
+4. Obtém buffer (linha 40-41):
+   mlx_get_data_addr(img, &bits_per_pixel, &line_length, &endian)
+   - Pega ponteiro direto para pixels da textura
+   - Permite acesso rápido sem chamadas MLX
+
+FORMATO XPM:
+/* XPM */
+static char *wall[] = {
+"64 64 2 1",     ← width height colors chars_per_pixel
+". c #FFFFFF",   ← cor 1
+"# c #000000",   ← cor 2
+"####............",  ← pixels linha 1
+...
+};
+
+--------------------------------------------------------------------------------
+int get_texture_color(t_img *texture, int x, int y)
+--------------------------------------------------------------------------------
+PROPÓSITO: Obtém cor de um pixel específico da textura
+
+FUNCIONAMENTO:
+
+1. Validação (linha 49-50):
+   - Verifica se texture não é NULL
+   - Verifica se (x,y) está dentro dos limites
+
+2. Calcula endereço (linha 51-52):
+   dst = addr + (y * line_length + x * (bits_per_pixel / 8))
+   - Mesma lógica que put_pixel()
+   - Mas para buffer da textura, não da tela
+
+3. Retorna cor (linha 53):
+   return *(unsigned int *)dst
+   - Cast para unsigned int
+   - Retorna valor ARGB (0xAARRGGBB)
+
+--------------------------------------------------------------------------------
+MINIMAP.C E MINIMAP_UTILS.C
+--------------------------------------------------------------------------------
+
+static void draw_minimap_grid(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Desenha o grid do mapa no minimapa
+
+FUNCIONAMENTO:
+- Loop por cada linha do mapa (até caber em MINIMAP_SIZE)
+- Para cada linha, chama draw_map_row()
+
+--------------------------------------------------------------------------------
+void draw_minimap_player(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Desenha ponto vermelho representando jogador
+
+FUNCIONAMENTO:
+
+1. Calcula posição na tela (linha 31-32):
+   player_x = MINIMAP_MARGIN + (int)(player->x * MINIMAP_TILE_SIZE)
+   player_y = MINIMAP_MARGIN + (int)(player->y * MINIMAP_TILE_SIZE)
+   - Converte coordenadas do mapa para pixels da tela
+   - Adiciona margem
+
+2. Desenha quadrado 5x5 (linha 33-47):
+   - Loop -2 a +2 em ambas direções
+   - Cor vermelha (0xFF0000)
+   - Verifica bounds para não sair do minimapa
+
+--------------------------------------------------------------------------------
+void draw_minimap(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Função principal que orquestra desenho do minimapa
+
+ORDEM:
+1. Fundo preto
+2. Grid do mapa
+3. Posição do jogador
+
+--------------------------------------------------------------------------------
+void draw_minimap_tile(t_game *game, int x, int y, int color)
+--------------------------------------------------------------------------------
+PROPÓSITO: Desenha um quadrado MINIMAP_TILE_SIZE x MINIMAP_TILE_SIZE
+
+FUNCIONAMENTO:
+- Loop duplo de 0 a MINIMAP_TILE_SIZE (10 pixels)
+- Pinta cada pixel com a cor especificada
+
+--------------------------------------------------------------------------------
+void draw_minimap_background(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Pinta fundo preto do minimapa
+
+FUNCIONAMENTO:
+- Loop de MINIMAP_MARGIN até MINIMAP_MARGIN + MINIMAP_SIZE
+- Pinta cada pixel de preto (0x000000)
+
+--------------------------------------------------------------------------------
+int get_tile_color(t_game *game, int map_y, int map_x)
+--------------------------------------------------------------------------------
+PROPÓSITO: Retorna cor apropriada para célula do mapa
+
+LÓGICA DE CORES:
+- '1' (parede): Branco (0xFFFFFF)
+- '0' ou jogador: Cinza (0x808080)
+- Outros: Preto (0x000000)
+
+--------------------------------------------------------------------------------
+void draw_map_row(t_game *game, int map_y)
+--------------------------------------------------------------------------------
+PROPÓSITO: Desenha uma linha horizontal do mapa
+
+FUNCIONAMENTO:
+1. Loop por cada coluna
+2. Pega cor com get_tile_color()
+3. Desenha tile com draw_minimap_tile()
+
+================================================================================
+🎮 6. PLAYER - Controles e Movimento
+================================================================================
+
+--------------------------------------------------------------------------------
+MOVEMENT.C
+--------------------------------------------------------------------------------
+
+static void process_wasd_keys(t_game *game, double *new_x, double *new_y)
+--------------------------------------------------------------------------------
+PROPÓSITO: Processa teclas WASD para movimento
+
+FUNCIONAMENTO:
+
+1. W - Frente (linha 17-21):
+   new_x += dir_x * MOVE_SPEED
+   new_y += dir_y * MOVE_SPEED
+   - Move na direção que está olhando
+
+2. S - Trás (linha 22-26):
+   new_x -= dir_x * MOVE_SPEED
+   new_y -= dir_y * MOVE_SPEED
+   - Move na direção oposta
+
+3. A - Esquerda (strafe) (linha 27-31):
+   new_x += dir_y * MOVE_SPEED
+   new_y -= dir_x * MOVE_SPEED
+   - Vetor perpendicular à direção (90° esquerda)
+
+4. D - Direita (strafe) (linha 32-36):
+   new_x -= dir_y * MOVE_SPEED
+   new_y += dir_x * MOVE_SPEED
+   - Vetor perpendicular à direção (90° direita)
+
+DIAGRAMA DE MOVIMENTO:
+        W (frente)
+          ↑
+    A ←   P   → D  (strafes laterais)
+          ↓
+        S (trás)
+
+--------------------------------------------------------------------------------
+void move_player(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Atualiza posição e rotação do jogador
+
+FUNCIONAMENTO:
+
+1. Inicializa posição (linha 41-42):
+   - Começa com posição atual
+
+2. Processa WASD (linha 43):
+   - Calcula nova posição desejada
+
+3. Aplica com colisão (linha 44-47):
+   - Tenta mover X: se não colidir, atualiza player->x
+   - Tenta mover Y: se não colidir, atualiza player->y
+   - SEPARADO: permite "deslizar" ao longo de paredes
+
+4. Rotação (linha 48-51):
+   - Seta esquerda: rotaciona -ROT_SPEED (-0.03 rad/frame)
+   - Seta direita: rotaciona +ROT_SPEED (+0.03 rad/frame)
+
+POR QUE X E Y SEPARADOS?
+Cenário: Player quer ir diagonal mas há parede em X
+
+    X →
+  ┌───┬───┐
+  │ P │###│  Sem separação: para completamente
+  └───┴───┘  Com separação: desliza para baixo
+    ↓ Y permitido
+
+--------------------------------------------------------------------------------
+void rotate_player(t_game *game, double angle)
+--------------------------------------------------------------------------------
+PROPÓSITO: Rotaciona direção de visão e plano de câmera
+
+MATEMÁTICA DA ROTAÇÃO:
+
+1. Rotaciona vetor de direção (linha 57-60):
+   new_dir_x = dir_x * cos(angle) - dir_y * sin(angle)
+   new_dir_y = old_dir_x * sin(angle) + dir_y * cos(angle)
+   - Matriz de rotação 2D padrão
+   - Preserva tamanho do vetor (magnitude = 1)
+
+2. Rotaciona plano de câmera (linha 61-64):
+   - Mesma transformação no vetor plane
+   - Mantém perpendicular à direção
+
+MATRIZ DE ROTAÇÃO:
+[cos θ  -sin θ] [x]   [x']
+[sin θ   cos θ] [y] = [y']
+
+VISUALIZAÇÃO:
+Antes:          Depois (rotação +30°):
+    ↑               ↗
+    |              /
+    P            P
+
+--------------------------------------------------------------------------------
+COLLISION.C
+--------------------------------------------------------------------------------
+
+static int check_position(t_game *game, int map_x, int map_y)
+--------------------------------------------------------------------------------
+PROPÓSITO: Verifica se uma célula específica bloqueia movimento
+
+FUNCIONAMENTO:
+
+1. Bounds check (linha 18-19):
+   - Se (map_x, map_y) fora do mapa, retorna 1 (colide)
+
+2. Verifica célula (linha 20-26):
+   - Se dentro dos limites E índice válido
+   - Verifica se é '1' (parede)
+   - Retorna 1 se parede, 0 se livre
+
+3. Fora do mapa (linha 27):
+   - Se célula não existe, considera colisão
+
+--------------------------------------------------------------------------------
+int check_collision(t_game *game, double new_x, double new_y)
+--------------------------------------------------------------------------------
+PROPÓSITO: Verifica colisão considerando raio do jogador
+
+FUNCIONAMENTO DETALHADO:
+
+1. Define offsets (linha 35-36):
+   offs[0] = -PLAYER_RADIUS  // -0.2
+   offs[1] = +PLAYER_RADIUS  // +0.2
+
+2. Verifica 4 cantos (linha 38-49):
+   - Loop duplo cria 4 combinações:
+     * (-0.2, -0.2): canto superior esquerdo
+     * (-0.2, +0.2): canto superior direito
+     * (+0.2, -0.2): canto inferior esquerdo
+     * (+0.2, +0.2): canto inferior direito
+
+3. Para cada canto:
+   - Converte para coordenada de célula (int)
+   - Chama check_position()
+   - Se qualquer colidir, retorna 1
+
+4. Se nenhum colidir, retorna 0
+
+VISUALIZAÇÃO DO HITBOX:
+    (-0.2,-0.2)  (+0.2,-0.2)
+         ●────────●
+         │   P    │  ← Player radius = 0.2
+         ●────────●
+    (-0.2,+0.2)  (+0.2,+0.2)
+
+Verifica se algum canto está em parede
+
+================================================================================
+🧹 7. UTILS - Utilitários
+================================================================================
+
+--------------------------------------------------------------------------------
+CLEANUP.C
+--------------------------------------------------------------------------------
+
+static void cleanup_map(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Libera array de strings do mapa
+
+FUNCIONAMENTO:
+1. Loop por cada linha
+2. free() em cada string
+3. free() no array principal
+
+--------------------------------------------------------------------------------
+static void cleanup_textures_helper(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Libera todas as 4 texturas
+
+FUNCIONAMENTO:
+- Para cada textura (north, south, west, east):
+  - Se não for NULL, chama cleanup_texture()
+- Libera estrutura t_texture
+
+--------------------------------------------------------------------------------
+void cleanup_game(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Libera TODA a memória alocada
+
+ORDEM DE LIMPEZA:
+1. Mapa
+2. Texturas
+3. Imagem principal
+4. Jogador
+5. Janela MLX
+6. Display MLX
+
+CRÍTICO: Esta função previne memory leaks!
+
+--------------------------------------------------------------------------------
+void cleanup_texture(t_game *game, t_img *texture)
+--------------------------------------------------------------------------------
+PROPÓSITO: Libera uma textura específica
+
+FUNCIONAMENTO:
+1. Destrói imagem MLX
+2. Libera estrutura t_img
+
+--------------------------------------------------------------------------------
+ERROR.C
+--------------------------------------------------------------------------------
+
+void error_exit(char *message)
+--------------------------------------------------------------------------------
+PROPÓSITO: Imprime erro e termina programa
+
+FUNCIONAMENTO:
+- printf(message)
+- exit(1) - código de erro
+
+--------------------------------------------------------------------------------
+int key_press(int keycode, t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Handler quando tecla é pressionada
+
+FUNCIONAMENTO:
+
+1. ESC (linha 22-23):
+   - Fecha janela imediatamente
+
+2. Teclas normais (linha 24-25):
+   - Marca keys[keycode] = 1
+   - Exemplo: W pressionado → keys[119] = 1
+
+3. Setas especiais (linha 26-29):
+   - Códigos diferentes, usa índices especiais
+   - LEFT → keys[KEY_LEFT_IDX]
+   - RIGHT → keys[KEY_RIGHT_IDX]
+
+POR QUE ARRAY DE KEYS?
+- Permite múltiplas teclas simultaneamente
+- W+A = movimento diagonal
+- W+Seta = mover e rotacionar ao mesmo tempo
+
+--------------------------------------------------------------------------------
+int key_release(int keycode, t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Handler quando tecla é solta
+
+FUNCIONAMENTO:
+- Marca keys[keycode] = 0
+- Mesma lógica para setas especiais
+
+--------------------------------------------------------------------------------
+int close_window(t_game *game)
+--------------------------------------------------------------------------------
+PROPÓSITO: Fecha o programa de forma limpa
+
+FUNCIONAMENTO:
+1. Chama cleanup_game() para liberar memória
+2. exit(0) - código de sucesso
+
+--------------------------------------------------------------------------------
+MATH_UTILS.C
+--------------------------------------------------------------------------------
+
+int create_rgb(int r, int g, int b)
+--------------------------------------------------------------------------------
+PROPÓSITO: Combina componentes RGB em um inteiro hexadecimal
+
+FUNCIONAMENTO MATEMÁTICO:
+return (r << 16 | g << 8 | b)
+
+EXPLICAÇÃO BIT A BIT:
+- r << 16: desloca R para posição 16-23
+- g << 8: desloca G para posição 8-15
+- b: fica em posição 0-7
+- |: OR bit a bit combina tudo
+
+EXEMPLO:
+r = 255 (0xFF)
+g = 100 (0x64)
+b = 50  (0x32)
+
+r << 16 = 0x00FF0000
+g << 8  = 0x00006400
+b       = 0x00000032
+        ─────────────
+OR      = 0x00FF6432
+
+RESULTADO: 0xFF6432 (laranja)
+
+================================================================================
+🎯 RESUMO DO FLUXO COMPLETO
+================================================================================
+
+1. INICIALIZAÇÃO (main.c):
+   main() → valida args → init_game() → parse_file() → game_loop()
+
+2. PARSING (parsing/):
+   parse_file() → read_lines() → parse_textures() + parse_map() → validate_map()
+
+3. GAME LOOP (chamado ~60x por segundo):
+   render_frame() → move_player() → draw_background() → raycasting() → draw_minimap()
+
+4. RAYCASTING (para cada coluna da tela):
+   init_ray() → perform_dda() → calculate_wall_distance() → draw_wall()
+
+5. CLEANUP (ao fechar):
+   close_window() → cleanup_game() → libera tudo → exit()
+
+================================================================================
+📊 ESTRUTURAS DE DADOS PRINCIPAIS
+================================================================================
+
+t_game: Estrutura central que contém tudo
+- mlx: Conexão com X11
+- win: Janela
+- img: Buffer de desenho
+- map: Mapa 2D
+- textures: 4 texturas
+- player: Posição e direção
+- keys: Estado das teclas
+
+t_player: Estado do jogador
+- x, y: Posição no mapa
+- dir_x, dir_y: Direção de visão
+- plane_x, plane_y: Plano de câmera (FOV)
+
+t_ray: Dados de um raio
+- ray_dir_x, ray_dir_y: Direção do raio
+- map_x, map_y: Célula atual
+- perp_wall_dist: Distância até parede
+- hit: Encontrou parede?
+- side: Vertical ou horizontal?
+
+================================================================================
+🏆 CARACTERÍSTICAS DO PROJETO
+================================================================================
+
+✅ 100% conforme a Norminette (Escola 42)
+✅ Sem leaks de memória (testado com Valgrind)
+✅ Raycasting em tempo real (~60 FPS)
+✅ Texturas XPM customizáveis
+✅ Detecção de colisão suave
+✅ Minimapa em tempo real (bonus)
+✅ Cores de chão e teto configuráveis
+✅ Movimento WASD + rotação com setas
+
+================================================================================
+📝 CONTROLES
+================================================================================
+
+W - Mover para frente
+S - Mover para trás
+A - Strafe esquerda
+D - Strafe direita
+← - Rotacionar câmera à esquerda
+→ - Rotacionar câmera à direita
+ESC - Fechar programa
+
+================================================================================
+FIM DA DOCUMENTAÇÃO
+================================================================================

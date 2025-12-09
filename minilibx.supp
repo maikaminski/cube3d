@@ -1,0 +1,107 @@
+# Valgrind suppression file for MiniLibX and X11 libraries
+# These are not memory leaks from our code, but internal allocations
+# from graphics libraries that remain accessible until program termination
+
+{
+   mlx_init_leak
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:mlx_init
+}
+
+{
+   mlx_new_window_leak
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:mlx_new_window
+}
+
+{
+   mlx_new_image_leak
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:mlx_new_image
+}
+
+{
+   mlx_xpm_file_to_image_leak
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:mlx_xpm_file_to_image
+}
+
+{
+   x11_open_display
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:XOpenDisplay
+}
+
+{
+   x11_create_window
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:XCreateWindow
+}
+
+{
+   x11_create_image
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:XCreateImage
+}
+
+{
+   xcb_connect
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:xcb_connect*
+}
+
+{
+   xkb_keyboard
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:XkbGetMap
+}
+
+{
+   xkb_keysym
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:XkbKeycodeToKeysym
+}
+
+{
+   x11_font_loading
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:XLoadQueryFont
+}
+
+{
+   x11_event_queue
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_XReadEvents
+}
+
+{
+   x11_visual_info
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:XGetVisualInfo
+}

@@ -1,6 +1,18 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   cleanup.c                                          :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: mkaminski <mkaminski@student.42.fr>      +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/12/09 00:00:00 by mkaminski         #+#    #+#             */
+/*   Updated: 2025/12/09 00:00:00 by mkaminski        ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "../../includes/cube.h"
 
-void	cleanup_game(t_game *game)
+static void	cleanup_map(t_game *game)
 {
 	int	i;
 
@@ -14,18 +26,26 @@ void	cleanup_game(t_game *game)
 		}
 		free(game->map);
 	}
+}
+
+static void	cleanup_textures_helper(t_game *game)
+{
+	if (game->textures->north)
+		cleanup_texture(game, game->textures->north);
+	if (game->textures->south)
+		cleanup_texture(game, game->textures->south);
+	if (game->textures->west)
+		cleanup_texture(game, game->textures->west);
+	if (game->textures->east)
+		cleanup_texture(game, game->textures->east);
+	free(game->textures);
+}
+
+void	cleanup_game(t_game *game)
+{
+	cleanup_map(game);
 	if (game->textures)
-	{
-		if (game->textures->north)
-			cleanup_texture(game, game->textures->north);
-		if (game->textures->south)
-			cleanup_texture(game, game->textures->south);
-		if (game->textures->west)
-			cleanup_texture(game, game->textures->west);
-		if (game->textures->east)
-			cleanup_texture(game, game->textures->east);
-		free(game->textures);
-	}
+		cleanup_textures_helper(game);
 	if (game->img)
 	{
 		if (game->img->img)
