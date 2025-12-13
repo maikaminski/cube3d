@@ -143,6 +143,7 @@ int		validate_textures(t_game *game);
 int		check_walls(t_game *game);
 int		check_top_bottom_walls(t_game *game);
 int		check_side_walls(t_game *game);
+int		check_map_closed(t_game *game);
 void	parse_config_line(char **lines, int i, t_game *game, int *found);
 void	init_player(t_game *game, int y, int x, char direction);
 

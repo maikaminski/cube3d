@@ -63,9 +63,7 @@ int	validate_map(t_game *game)
 
 int	check_walls(t_game *game)
 {
-	if (!check_top_bottom_walls(game))
-		return (0);
-	if (!check_side_walls(game))
+	if (!check_map_closed(game))
 		return (0);
 	return (1);
 }

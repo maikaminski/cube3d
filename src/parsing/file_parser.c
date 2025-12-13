@@ -51,25 +51,13 @@ static char	**read_lines(int fd)
 static int	validate_all(char **lines, t_game *game)
 {
 	if (!parse_textures(lines, game))
-	{
-		free_lines(lines);
 		return (0);
-	}
 	if (!validate_textures(game))
-	{
-		free_lines(lines);
 		return (0);
-	}
 	if (!parse_map(lines, game))
-	{
-		free_lines(lines);
 		return (0);
-	}
 	if (!validate_map(game))
-	{
-		free_lines(lines);
 		return (0);
-	}
 	return (1);
 }
 
